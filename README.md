@@ -1,75 +1,32 @@
-# fleet-constraint
+# Fleet Constraint
 
-Fleet coordination safety constraint runtime — the binding layer that makes a fleet a fleet.
+**The gatekeeper. Every fleet agent embeds this for safety constraint checking and Keeper communication.**
 
-## What It Does
+A fleet of agents is not a fleet just because the agents can reach each other. A fleet is a fleet because the agents share a constraint layer — rules about what's allowed, what's forbidden, and what requires consensus before proceeding.
 
-`fleet-constraint` is a process-level component that fleet agents embed to participate in time-synchronized safety constraint checking and Keeper communication.
+`fleet-constraint` is that layer. No tile leaves an agent without passing through constraint evaluation. No Keeper command reaches an agent without safety validation. The gatekeeper stands between every agent and every action.
 
-Every fleet agent that handles trust-sensitive operations embeds `fleet-constraint` as its **constraint layer**. It is the gatekeeper: no tile leaves the agent without passing through constraint evaluation, and no Keeper command reaches the agent without safety validation.
+---
 
 ## Core Modules
 
-- **GuardRuntime** — Load `.guard` files, compile to FLUX-C bytecode, evaluate constraints
-- **FleetMathCore** — H1 emergence detection, zero-holonomy consensus, Pythagorean48 trust encoding
-- **KeeperBridge** — cocapn-glue-core wire protocol for Keeper ↔ Fleet communication
-- **TempoSync** — crystal_sync subprocess wrapper for phase coherence checking
-- **SafetyWatcher** — Monitors constraint results and fleet state for safety violations
+**GuardRuntime** — Load `.guard` files (GD&T-like constraint specifications), compile to FLUX-C bytecode (43-opcode terminating ISA), evaluate constraints at runtime. Guaranteed to terminate. Guaranteed to produce the same result on every machine.
 
-## Quick Start
+**FleetMathCore** — H¹ emergence detection (sheaf cohomology over the fleet graph), zero-holonomy consensus (cycle detection as agreement), Pythagorean48 trust encoding (48 exact direction vectors).
 
-```bash
-pip install fleet-constraint
+**KeeperBridge** — [cocapn-glue-core](https://github.com/SuperInstance/cocapn-glue-core) wire protocol for Keeper ↔ Fleet communication. Agents never hold secrets. The Keeper proxies every credential request, issuing time-scoped tokens.
 
-# Run the CLI
-fleet-constraint --guard safety.guard --keeper-addr keeper.cocapn.local --agent-id murmur-001
-```
+---
 
-## Example `.guard` File
+## How It Fits
 
-```
-# safety.guard — fleet constraint definitions
-# Format: name:var:op:value:priority[:condition]
+- **[fleet-constraint](https://github.com/SuperInstance/fleet-constraint)** — constraint runtime (this)
+- **[fleet-topology](https://github.com/SuperInstance/fleet-topology)** — network topology and routing
+- **[fleet-coordinate](https://github.com/SuperInstance/fleet-coordinate)** — spatial coordination on hex lattices
+- **[holonomy-consensus](https://github.com/SuperInstance/holonomy-consensus)** — cycle-detection consensus
+- **[cocapn-glue-core](https://github.com/SuperInstance/cocapn-glue-core)** — wire protocol across all hardware tiers
 
-h1_guard:h1:<:0.95:10
-zhc_guard:zhc:>=:0.85:5:if_phase_SYNC
-tempo_guard:tempo:>:0.5:3
-drift_guard:drift:<:0.1:2
-```
-
-## Embedding in a Domain Agent
-
-```python
-from fleet_constraint import GuardRuntime, FleetMathCore, KeeperBridge, SafetyWatcher, TempoSync
-
-runtime = GuardRuntime()
-math_core = FleetMathCore()
-bridge = KeeperBridge(agent_id="murmur-001")
-watcher = SafetyWatcher()
-
-# Load constraints
-lines = runtime.load_file("safety.guard")
-
-# Evaluate
-results = runtime.evaluate(lines, {"h1": 0.3, "zhc": 0.9, "tempo": 0.8})
-for line, satisfied in results:
-    print(f"{'✓' if satisfied else '✗'} {line.name}")
-```
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────┐
-│  Domain Agents: murmur, spread, whisper-sync     │
-├─────────────────────────────────────────────────┤
-│  fleet-constraint                               │
-│  ├── GuardRuntime    (GUARD DSL → FLUX-C)       │
-│  ├── FleetMathCore   (H1, ZHC, Pythagorean48)  │
-│  ├── KeeperBridge    (cocapn-glue-core wire)   │
-│  ├── TempoSync       (crystal_sync wrapper)    │
-│  └── SafetyWatcher   (phase anomaly detection)  │
-└─────────────────────────────────────────────────┘
-```
+---
 
 ## License
 
